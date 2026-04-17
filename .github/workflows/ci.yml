@@ -21,8 +21,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
       - name: Run tests
-        run: ./mvnw verify -q
+        run: ./mvnw verify -B
 
       - name: Upload test report
         if: failure()
