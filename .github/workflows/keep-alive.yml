@@ -11,12 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping /actuator/health
+      - name: Ping /actuator/health/ping
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.API_BASE_URL }}/actuator/health")
+            "${{ secrets.API_BASE_URL }}/actuator/health/ping")
           echo "HTTP status: $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "WARNING: Health check returned $STATUS"
-            # Don't fail — a cold-start can take > 30 s on Render's free tier
           fi
