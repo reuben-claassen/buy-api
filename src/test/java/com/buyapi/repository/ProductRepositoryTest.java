@@ -34,24 +34,33 @@ class ProductRepositoryTest {
     }
 
     @Test
-    void search_byNameSubstring_returnsMatchingProducts() {
+    void searchWithQuery_byNameSubstring_returnsMatchingActiveProducts() {
         save("Blue Widget", true);
         save("Red Gadget", true);
         save("Blue Gadget", false);
 
-        Page<Product> result = productRepository.search("blue", null, PageRequest.of(0, 10));
+        Page<Product> result = productRepository.searchWithQuery("blue", null, PageRequest.of(0, 10));
 
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("Blue Widget");
     }
 
     @Test
-    void search_noQuery_returnsAllActiveProducts() {
+    void searchWithQuery_caseInsensitive_returnsMatch() {
+        save("Blue Widget", true);
+
+        Page<Product> result = productRepository.searchWithQuery("BLUE", null, PageRequest.of(0, 10));
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    void searchWithoutQuery_returnsAllActiveProducts() {
         save("Product A", true);
         save("Product B", true);
         save("Product C", false);
 
-        Page<Product> result = productRepository.search(null, null, PageRequest.of(0, 10));
+        Page<Product> result = productRepository.searchWithoutQuery(null, PageRequest.of(0, 10));
 
         assertThat(result.getTotalElements()).isEqualTo(2);
     }

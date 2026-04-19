@@ -35,7 +35,12 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> search(String query, Long categoryId, Pageable pageable) {
-        Page<Product> page = productRepository.search(query, categoryId, pageable);
+        Page<Product> page;
+        if (query == null || query.isBlank()) {
+            page = productRepository.searchWithoutQuery(categoryId, pageable);
+        } else {
+            page = productRepository.searchWithQuery(query, categoryId, pageable);
+        }
         return toPageResponse(page);
     }
 

@@ -242,16 +242,44 @@ class ProductServiceTest {
     }
 
     @Test
-    void search_returnsPagedResults() {
+    void search_nullQuery_usesSearchWithoutQuery() {
         Page<Product> page = new PageImpl<>(List.of(sampleProduct()), PageRequest.of(0, 20), 1);
 
-        when(productRepository.search(any(), any(), any())).thenReturn(page);
+        when(productRepository.searchWithoutQuery(any(), any())).thenReturn(page);
 
         PageResponse<ProductResponse> result =
                 productService.search(null, null, PageRequest.of(0, 20));
 
         assertThat(result.content()).hasSize(1);
         assertThat(result.totalElements()).isEqualTo(1);
+        verify(productRepository).searchWithoutQuery(null, PageRequest.of(0, 20));
+        verify(productRepository, never()).searchWithQuery(any(), any(), any());
+    }
+
+    @Test
+    void search_blankQuery_usesSearchWithoutQuery() {
+        Page<Product> page = new PageImpl<>(List.of(), PageRequest.of(0, 20), 0);
+
+        when(productRepository.searchWithoutQuery(any(), any())).thenReturn(page);
+
+        productService.search("   ", null, PageRequest.of(0, 20));
+
+        verify(productRepository).searchWithoutQuery(null, PageRequest.of(0, 20));
+        verify(productRepository, never()).searchWithQuery(any(), any(), any());
+    }
+
+    @Test
+    void search_withQuery_usesSearchWithQuery() {
+        Page<Product> page = new PageImpl<>(List.of(sampleProduct()), PageRequest.of(0, 20), 1);
+
+        when(productRepository.searchWithQuery(any(), any(), any())).thenReturn(page);
+
+        PageResponse<ProductResponse> result =
+                productService.search("widget", null, PageRequest.of(0, 20));
+
+        assertThat(result.content()).hasSize(1);
+        verify(productRepository).searchWithQuery("widget", null, PageRequest.of(0, 20));
+        verify(productRepository, never()).searchWithoutQuery(any(), any());
     }
 
     @Test
