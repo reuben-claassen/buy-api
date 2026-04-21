@@ -1,14 +1,5 @@
 package com.buyapi.controller;
 
-import com.buyapi.dto.request.OrderRequest;
-import com.buyapi.dto.response.Responses.OrderResponse;
-import com.buyapi.dto.response.Responses.PageResponse;
-import com.buyapi.service.impl.OrderService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -16,7 +7,25 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.buyapi.dto.request.OrderRequest;
+import com.buyapi.dto.response.Responses.OrderResponse;
+import com.buyapi.dto.response.Responses.PageResponse;
+import com.buyapi.service.impl.OrderService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @Tag(name = "Orders")
 @SecurityRequirement(name = "bearerAuth")
@@ -41,9 +50,10 @@ public class OrderController {
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getById(@PathVariable Long id,
                                                   @AuthenticationPrincipal UserDetails user) {
-        boolean isAdmin = user.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        return ResponseEntity.ok(orderService.getById(id, user.getUsername(), isAdmin));
+        boolean isPrivileged = user.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")
+                            || a.getAuthority().equals("ROLE_SELLER"));
+        return ResponseEntity.ok(orderService.getById(id, user.getUsername(), isPrivileged));
     }
 
     @Operation(summary = "Place order")
@@ -60,12 +70,14 @@ public class OrderController {
                                                 @AuthenticationPrincipal UserDetails user) {
         boolean isAdmin = user.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        return ResponseEntity.ok(orderService.cancelOrder(id, user.getUsername(), isAdmin));
+        boolean isSeller = user.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SELLER"));
+        return ResponseEntity.ok(orderService.cancelOrder(id, user.getUsername(), isAdmin, isSeller));
     }
 
     @Operation(summary = "List orders")
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SELLER')")
     public ResponseEntity<PageResponse<OrderResponse>> getAll(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -75,9 +87,14 @@ public class OrderController {
 
     @Operation(summary = "Update order status")
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SELLER')")
     public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id,
-                                                      @RequestParam String status) {
-        return ResponseEntity.ok(orderService.updateStatus(id, status));
+                                                      @RequestParam String status,
+                                                      @AuthenticationPrincipal UserDetails user) {
+        boolean isAdmin = user.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isSeller = user.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SELLER"));
+        return ResponseEntity.ok(orderService.updateStatus(id, status, user.getUsername(), isAdmin, isSeller));
     }
 }

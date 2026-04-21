@@ -149,26 +149,26 @@ class OrderControllerTest {
     @Test
     @WithMockUser(username = "jane@example.com", roles = "CUSTOMER")
     void cancel_customer_cancelsOwnOrder() throws Exception {
-        given(orderService.cancelOrder(1L, "jane@example.com", false))
+        given(orderService.cancelOrder(1L, "jane@example.com", false, false))
                 .willReturn(sampleOrder(1L, "CANCELLED"));
 
         mockMvc.perform(post("/api/orders/1/cancel"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
 
-        verify(orderService).cancelOrder(1L, "jane@example.com", false);
+        verify(orderService).cancelOrder(1L, "jane@example.com", false, false);
     }
 
     @Test
     @WithMockUser(username = "admin@example.com", roles = "ADMIN")
     void cancel_admin_passesIsAdminTrue() throws Exception {
-        given(orderService.cancelOrder(1L, "admin@example.com", true))
+        given(orderService.cancelOrder(1L, "admin@example.com", true, false))
                 .willReturn(sampleOrder(1L, "CANCELLED"));
 
         mockMvc.perform(post("/api/orders/1/cancel"))
                 .andExpect(status().isOk());
 
-        verify(orderService).cancelOrder(1L, "admin@example.com", true);
+        verify(orderService).cancelOrder(1L, "admin@example.com", true, false);
     }
 
     @Test
@@ -198,13 +198,13 @@ class OrderControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void updateStatus_admin_returnsOk() throws Exception {
-        given(orderService.updateStatus(1L, "SHIPPED")).willReturn(sampleOrder(1L, "SHIPPED"));
+        given(orderService.updateStatus(eq(1L), eq("SHIPPED"), any(), eq(true), eq(false))).willReturn(sampleOrder(1L, "SHIPPED"));
 
         mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SHIPPED"));
 
-        verify(orderService).updateStatus(1L, "SHIPPED");
+        verify(orderService).updateStatus(eq(1L), eq("SHIPPED"), any(), eq(true), eq(false));
     }
 
     @Test
@@ -219,4 +219,29 @@ class OrderControllerTest {
         mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void cancel_seller_passesIsSellerTrue() throws Exception {
+        given(orderService.cancelOrder(1L, "seller@example.com", false, true))
+                .willReturn(sampleOrder(1L, "CANCELLED"));
+
+        mockMvc.perform(post("/api/orders/1/cancel"))
+                .andExpect(status().isOk());
+
+        verify(orderService).cancelOrder(1L, "seller@example.com", false, true);
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void updateStatus_seller_callsServiceWithIsSellerTrue() throws Exception {
+        given(orderService.updateStatus(eq(1L), eq("SHIPPED"), eq("seller@example.com"), eq(false), eq(true)))
+                .willReturn(sampleOrder(1L, "SHIPPED"));
+
+        mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
+                .andExpect(status().isOk());
+
+        verify(orderService).updateStatus(eq(1L), eq("SHIPPED"), eq("seller@example.com"), eq(false), eq(true));
+    }
+
 }

@@ -1,14 +1,18 @@
 package com.buyapi.service.impl;
 
-import com.buyapi.dto.response.Responses.PageResponse;
-import com.buyapi.dto.response.Responses.UserResponse;
-import com.buyapi.exception.ResourceNotFoundException;
-import com.buyapi.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.buyapi.dto.response.Responses.PageResponse;
+import com.buyapi.dto.response.Responses.UserResponse;
+import com.buyapi.entity.User;
+import com.buyapi.exception.BadRequestException;
+import com.buyapi.exception.ResourceNotFoundException;
+import com.buyapi.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -45,5 +49,16 @@ public class UserService {
             throw new ResourceNotFoundException("User", id);
         }
         userRepository.deleteById(id);
+    }
+    @Transactional
+    public UserResponse changeRole(Long id, String role) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
+        try {
+            user.setRole(User.Role.valueOf(role.toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid role: " + role + ". Valid values: CUSTOMER, SELLER, ADMIN");
+        }
+        return UserResponse.from(userRepository.save(user));
     }
 }

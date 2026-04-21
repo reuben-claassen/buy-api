@@ -25,17 +25,16 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
- 
 
 /**
- * @WebMvcTest slice for order endpoints.
+ * @WebMvcTest slice for product endpoints.
  *
  * Notes:
- * - Method-level security (@PreAuthorize) is enforced in this slice.
- * - Endpoints relying on @AuthenticationPrincipal require @WithMockUser.
- * - Unauthenticated and role-based access is verified here where supported,
- *   and complemented by integration tests for full security coverage.
- *
+ * - Method-level security (@PreAuthorize) is enforced in this slice via @EnableMethodSecurity.
+ * - URL-level role rules from SecurityConfig are NOT loaded here — those are covered
+ *   by SecurityIntegrationTest (e.g. CUSTOMER/unauthenticated blocked from write endpoints).
+ * - create/update/uploadImage inject @AuthenticationPrincipal, so the service
+ *   receives the caller's email and an isAdmin/isSeller flag derived from their role.
  * - ObjectMapper is instantiated manually (not auto-configured in this slice).
  */
 @WebMvcTest(controllers = ProductController.class)
@@ -50,7 +49,13 @@ class ProductControllerTest {
     private ProductResponse sampleProduct() {
         return new ProductResponse(
                 1L, "Widget", "A fine widget", new BigDecimal("9.99"),
-                100, null, true, null, Instant.now());
+                100, null, true, null, null, Instant.now());
+    }
+
+    private ProductResponse sampleProductWithSeller(Long sellerId) {
+        return new ProductResponse(
+                1L, "Widget", "A fine widget", new BigDecimal("9.99"),
+                100, null, true, null, sellerId, Instant.now());
     }
 
     private PageResponse<ProductResponse> singlePage(ProductResponse p) {
@@ -71,9 +76,7 @@ class ProductControllerTest {
     void search_withQueryAndCategory_passesParamsToService() throws Exception {
         given(productService.search(eq("wid"), eq(5L), any())).willReturn(singlePage(sampleProduct()));
 
-        mockMvc.perform(get("/api/products")
-                        .param("q", "wid")
-                        .param("categoryId", "5"))
+        mockMvc.perform(get("/api/products").param("q", "wid").param("categoryId", "5"))
                 .andExpect(status().isOk());
 
         verify(productService).search(eq("wid"), eq(5L), any());
@@ -106,25 +109,40 @@ class ProductControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
-    void create_validRequest_returns201() throws Exception {
-        ProductRequest request = new ProductRequest(
-                "Widget", "A fine widget", new BigDecimal("9.99"), 100, null);
-
-        given(productService.create(any(ProductRequest.class))).willReturn(sampleProduct());
+    @WithMockUser(username = "admin@example.com", roles = "ADMIN")
+    void create_asAdmin_passesNullSellerEmail() throws Exception {
+        ProductRequest request = new ProductRequest("Widget", "A fine widget", new BigDecimal("9.99"), 100, null);
+        given(productService.create(any(ProductRequest.class), isNull())).willReturn(sampleProduct());
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Widget"));
+
+        verify(productService).create(any(ProductRequest.class), isNull());
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void create_asSeller_passesSellerEmail() throws Exception {
+        ProductRequest request = new ProductRequest("Widget", "A fine widget", new BigDecimal("9.99"), 100, null);
+        given(productService.create(any(ProductRequest.class), eq("seller@example.com")))
+                .willReturn(sampleProductWithSeller(2L));
+
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.sellerId").value(2));
+
+        verify(productService).create(any(ProductRequest.class), eq("seller@example.com"));
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void create_blankName_returns400() throws Exception {
-        ProductRequest request = new ProductRequest(
-                "", "desc", new BigDecimal("9.99"), 10, null);
+        ProductRequest request = new ProductRequest("", "desc", new BigDecimal("9.99"), 10, null);
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -135,8 +153,7 @@ class ProductControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void create_priceBelowMinimum_returns400() throws Exception {
-        ProductRequest request = new ProductRequest(
-                "Widget", "desc", new BigDecimal("0.00"), 10, null);
+        ProductRequest request = new ProductRequest("Widget", "desc", new BigDecimal("0.00"), 10, null);
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,8 +164,7 @@ class ProductControllerTest {
     @Test
     @WithMockUser(roles = "ADMIN")
     void create_negativeStock_returns400() throws Exception {
-        ProductRequest request = new ProductRequest(
-                "Widget", "desc", new BigDecimal("9.99"), -1, null);
+        ProductRequest request = new ProductRequest("Widget", "desc", new BigDecimal("9.99"), -1, null);
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -157,17 +173,133 @@ class ProductControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
-    void update_validRequest_returnsOk() throws Exception {
-        ProductRequest request = new ProductRequest(
-                "Widget v2", "Updated", new BigDecimal("12.99"), 50, null);
-
-        given(productService.update(eq(1L), any(ProductRequest.class))).willReturn(sampleProduct());
+    @WithMockUser(username = "admin@example.com", roles = "ADMIN")
+    void update_asAdmin_passesIsAdminTrue() throws Exception {
+        ProductRequest request = new ProductRequest("Widget v2", "Updated", new BigDecimal("12.99"), 50, null);
+        given(productService.update(eq(1L), any(ProductRequest.class), eq("admin@example.com"), eq(true)))
+                .willReturn(sampleProduct());
 
         mockMvc.perform(put("/api/products/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
+
+        verify(productService).update(eq(1L), any(ProductRequest.class), eq("admin@example.com"), eq(true));
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void update_asSeller_passesIsAdminFalse() throws Exception {
+        ProductRequest request = new ProductRequest("Widget v2", "Updated", new BigDecimal("12.99"), 50, null);
+        given(productService.update(eq(1L), any(ProductRequest.class), eq("seller@example.com"), eq(false)))
+                .willReturn(sampleProduct());
+
+        mockMvc.perform(put("/api/products/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+
+        verify(productService).update(eq(1L), any(ProductRequest.class), eq("seller@example.com"), eq(false));
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void update_sellerDoesNotOwnProduct_returns403() throws Exception {
+        ProductRequest request = new ProductRequest("Widget v2", "Updated", new BigDecimal("12.99"), 50, null);
+        given(productService.update(eq(1L), any(ProductRequest.class), eq("seller@example.com"), eq(false)))
+                .willThrow(new org.springframework.security.access.AccessDeniedException("You do not own this product"));
+
+        mockMvc.perform(put("/api/products/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin@example.com", roles = "ADMIN")
+    void uploadImage_asAdmin_returnsOkWithUpdatedProduct() throws Exception {
+        ProductResponse responseWithImage = new ProductResponse(
+                1L, "Widget", "A fine widget", new BigDecimal("9.99"),
+                100, "http://example.com/widget.jpg", true, null, null, Instant.now());
+
+        given(productService.uploadImage(eq(1L), any(), eq("admin@example.com"), eq(true)))
+                .willReturn(responseWithImage);
+
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file", "widget.jpg", MediaType.IMAGE_JPEG_VALUE, "fake-jpeg-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/products/1/image").file(imageFile))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imageUrl").value("http://example.com/widget.jpg"));
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void uploadImage_asSeller_ownProduct_returnsOk() throws Exception {
+        ProductResponse responseWithImage = new ProductResponse(
+                1L, "Widget", "A fine widget", new BigDecimal("9.99"),
+                100, "http://example.com/widget.jpg", true, null, 2L, Instant.now());
+
+        given(productService.uploadImage(eq(1L), any(), eq("seller@example.com"), eq(false)))
+                .willReturn(responseWithImage);
+
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file", "widget.jpg", MediaType.IMAGE_JPEG_VALUE, "fake-jpeg-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/products/1/image").file(imageFile))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = "seller@example.com", roles = "SELLER")
+    void uploadImage_sellerDoesNotOwnProduct_returns403() throws Exception {
+        given(productService.uploadImage(eq(1L), any(), eq("seller@example.com"), eq(false)))
+                .willThrow(new org.springframework.security.access.AccessDeniedException("You do not own this product"));
+
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file", "widget.jpg", MediaType.IMAGE_JPEG_VALUE, "fake-jpeg-bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/products/1/image").file(imageFile))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void uploadImage_nonImageContentType_returns400() throws Exception {
+        given(productService.uploadImage(eq(1L), any(), any(), anyBoolean()))
+                .willThrow(new com.buyapi.exception.BadRequestException("File must be an image"));
+
+        MockMultipartFile textFile = new MockMultipartFile(
+                "file", "notes.txt", MediaType.TEXT_PLAIN_VALUE, "not an image".getBytes());
+
+        mockMvc.perform(multipart("/api/products/1/image").file(textFile))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void uploadImage_productNotFound_returns404() throws Exception {
+        given(productService.uploadImage(eq(99L), any(), any(), anyBoolean()))
+                .willThrow(new com.buyapi.exception.ResourceNotFoundException("Product", 99L));
+
+        MockMultipartFile imageFile = new MockMultipartFile(
+                "file", "photo.png", MediaType.IMAGE_PNG_VALUE, "fake-png".getBytes());
+
+        mockMvc.perform(multipart("/api/products/99/image").file(imageFile))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void uploadImage_emptyFile_returns400() throws Exception {
+        given(productService.uploadImage(eq(1L), any(), any(), anyBoolean()))
+                .willThrow(new com.buyapi.exception.BadRequestException("File must not be empty"));
+
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "file", "empty.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[0]);
+
+        mockMvc.perform(multipart("/api/products/1/image").file(emptyFile))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -177,78 +309,5 @@ class ProductControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(productService).delete(1L);
-    }
-    
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void uploadImage_validImageFile_returnsOkWithUpdatedProduct() throws Exception {
-        ProductResponse responseWithImage = new ProductResponse(
-                1L, "Widget", "A fine widget", new BigDecimal("9.99"),
-                100, "http://example.com/widget.jpg", true, null, Instant.now());
- 
-        given(productService.uploadImage(eq(1L), any())).willReturn(responseWithImage);
- 
-        MockMultipartFile imageFile = new MockMultipartFile(
-                "file",
-                "widget.jpg",
-                MediaType.IMAGE_JPEG_VALUE,
-                "fake-jpeg-bytes".getBytes()
-        );
- 
-        mockMvc.perform(multipart("/api/products/1/image").file(imageFile))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.imageUrl").value("http://example.com/widget.jpg"));
-    }
- 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void uploadImage_nonImageContentType_returns400() throws Exception {
-        given(productService.uploadImage(eq(1L), any()))
-                .willThrow(new com.buyapi.exception.BadRequestException("File must be an image"));
- 
-        MockMultipartFile textFile = new MockMultipartFile(
-                "file",
-                "notes.txt",
-                MediaType.TEXT_PLAIN_VALUE,
-                "not an image".getBytes()
-        );
- 
-        mockMvc.perform(multipart("/api/products/1/image").file(textFile))
-                .andExpect(status().isBadRequest());
-    }
- 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void uploadImage_productNotFound_returns404() throws Exception {
-        given(productService.uploadImage(eq(99L), any()))
-                .willThrow(new com.buyapi.exception.ResourceNotFoundException("Product", 99L));
- 
-        MockMultipartFile imageFile = new MockMultipartFile(
-                "file",
-                "photo.png",
-                MediaType.IMAGE_PNG_VALUE,
-                "fake-png".getBytes()
-        );
- 
-        mockMvc.perform(multipart("/api/products/99/image").file(imageFile))
-                .andExpect(status().isNotFound());
-    }
- 
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void uploadImage_emptyFile_returns400() throws Exception {
-        given(productService.uploadImage(eq(1L), any()))
-                .willThrow(new com.buyapi.exception.BadRequestException("File must not be empty"));
- 
-        MockMultipartFile emptyFile = new MockMultipartFile(
-                "file",
-                "empty.jpg",
-                MediaType.IMAGE_JPEG_VALUE,
-                new byte[0]
-        );
- 
-        mockMvc.perform(multipart("/api/products/1/image").file(emptyFile))
-                .andExpect(status().isBadRequest());
     }
 }

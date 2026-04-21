@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -123,4 +124,38 @@ class UserControllerTest {
         mockMvc.perform(delete("/api/users/1"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void changeRole_admin_returnsUpdatedUser() throws Exception {
+        given(userService.changeRole(1L, "SELLER"))
+                .willReturn(new UserResponse(1L, "jane@example.com", "Jane Doe", "SELLER", java.time.Instant.now()));
+
+        mockMvc.perform(patch("/api/users/1/role").param("role", "SELLER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("SELLER"));
+
+        verify(userService).changeRole(1L, "SELLER");
+    }
+
+    @Test
+    @WithMockUser(roles = "SELLER")
+    void changeRole_seller_returns403() throws Exception {
+        mockMvc.perform(patch("/api/users/1/role").param("role", "CUSTOMER"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void changeRole_customer_returns403() throws Exception {
+        mockMvc.perform(patch("/api/users/1/role").param("role", "ADMIN"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void changeRole_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(patch("/api/users/1/role").param("role", "SELLER"))
+                .andExpect(status().isUnauthorized());
+    }
+
 }

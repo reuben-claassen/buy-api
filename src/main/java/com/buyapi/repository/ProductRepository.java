@@ -1,11 +1,14 @@
 package com.buyapi.repository;
 
-import com.buyapi.entity.Product;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import com.buyapi.entity.Product;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -31,4 +34,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """)
     Page<Product> searchWithoutQuery(@Param("categoryId") Long categoryId,
                                      Pageable pageable);
+
+    @Query("SELECT p FROM Product p WHERE p.id = :id AND p.seller.email = :email")
+    Optional<Product> findByIdAndSellerEmail(@Param("id") Long id, @Param("email") String email);
+
+    Page<Product> findBySellerEmailAndActiveTrue(String email, Pageable pageable);
 }

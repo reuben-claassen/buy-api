@@ -26,10 +26,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @WebMvcTest slice for category endpoints.
  *
  * Notes:
- * - Security is defined via URL rules in SecurityConfig. The full filter chain
- *   is not loaded here, so role enforcement is verified in integration tests.
- * - @WithMockUser is used only to satisfy authenticated controller execution.
- *
+ * - URL-level role rules from SecurityConfig are NOT loaded in this slice — those
+ *   are covered by SecurityIntegrationTest (e.g. CUSTOMER/unauthenticated blocked,
+ *   SELLER blocked from delete).
+ * - @WithMockUser is used to satisfy authenticated controller execution and to verify
+ *   that SELLER is permitted to create/update via the SecurityConfig URL rules
+ *   (confirmed in SecurityIntegrationTest) and service delegation here.
  * - ObjectMapper is instantiated manually (not auto-configured in this slice).
  */
 @WebMvcTest(controllers = CategoryController.class)
@@ -97,7 +99,20 @@ class CategoryControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void create_validRequest_returns201() throws Exception {
+    void create_asAdmin_returns201() throws Exception {
+        CategoryRequest request = new CategoryRequest("Electronics", "All things electronic", null);
+        given(categoryService.create(any(CategoryRequest.class))).willReturn(electronics());
+
+        mockMvc.perform(post("/api/categories")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Electronics"));
+    }
+
+    @Test
+    @WithMockUser(roles = "SELLER")
+    void create_asSeller_returns201() throws Exception {
         CategoryRequest request = new CategoryRequest("Electronics", "All things electronic", null);
         given(categoryService.create(any(CategoryRequest.class))).willReturn(electronics());
 
@@ -134,7 +149,19 @@ class CategoryControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void update_validRequest_returnsOk() throws Exception {
+    void update_asAdmin_returnsOk() throws Exception {
+        CategoryRequest request = new CategoryRequest("Electronics v2", "Updated", null);
+        given(categoryService.update(eq(1L), any(CategoryRequest.class))).willReturn(electronics());
+
+        mockMvc.perform(put("/api/categories/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "SELLER")
+    void update_asSeller_returnsOk() throws Exception {
         CategoryRequest request = new CategoryRequest("Electronics v2", "Updated", null);
         given(categoryService.update(eq(1L), any(CategoryRequest.class))).willReturn(electronics());
 
@@ -146,7 +173,7 @@ class CategoryControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
-    void delete_existingCategory_returns204() throws Exception {
+    void delete_asAdmin_returns204() throws Exception {
         mockMvc.perform(delete("/api/categories/1"))
                 .andExpect(status().isNoContent());
 

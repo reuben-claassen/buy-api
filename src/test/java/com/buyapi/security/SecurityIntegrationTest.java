@@ -15,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -55,6 +56,11 @@ class SecurityIntegrationTest {
     private static org.springframework.test.web.servlet.request.RequestPostProcessor asAdmin() {
         return user("admin@example.com")
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor asSeller() {
+        return user("seller@example.com")
+                .authorities(new SimpleGrantedAuthority("ROLE_SELLER"));
     }
 
     @Nested
@@ -366,4 +372,115 @@ class SecurityIntegrationTest {
                     .andExpect(status().is2xxSuccessful());
         }
     }
+
+    @Nested
+    @DisplayName("Seller-permitted endpoints — ROLE_SELLER can create/update products, categories, and manage orders")
+    class SellerPermitted {
+
+        @Test
+        @DisplayName("POST /api/products as SELLER -> not 403")
+        void createProduct_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(post("/api/products")
+                            .with(asSeller())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Widget\",\"description\":\"desc\",\"price\":9.99,\"stock\":10}"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("PUT /api/products/{id} as SELLER -> not 403")
+        void updateProduct_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(put("/api/products/1")
+                            .with(asSeller())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Widget\",\"description\":\"desc\",\"price\":9.99,\"stock\":10}"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("POST /api/categories as SELLER -> not 403")
+        void createCategory_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(post("/api/categories")
+                            .with(asSeller())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Electronics\"}"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("PUT /api/categories/{id} as SELLER -> not 403")
+        void updateCategory_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(put("/api/categories/1")
+                            .with(asSeller())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"name\":\"Electronics\"}"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("GET /api/orders as SELLER -> not 403")
+        void getAllOrders_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(get("/api/orders").with(asSeller()))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("PUT /api/orders/{id}/status as SELLER -> not 403")
+        void updateOrderStatus_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(put("/api/orders/1/status")
+                            .with(asSeller())
+                            .param("status", "SHIPPED"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+    }
+
+    @Nested
+    @DisplayName("Seller-forbidden endpoints — ROLE_SELLER cannot delete or manage users")
+    class SellerForbidden {
+
+        @Test
+        @DisplayName("DELETE /api/products/{id} as SELLER -> 403")
+        void deleteProduct_asSeller_returns403() throws Exception {
+            mockMvc.perform(delete("/api/products/1").with(asSeller()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("DELETE /api/categories/{id} as SELLER -> 403")
+        void deleteCategory_asSeller_returns403() throws Exception {
+            mockMvc.perform(delete("/api/categories/1").with(asSeller()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /api/users as SELLER -> 403")
+        void listUsers_asSeller_returns403() throws Exception {
+            mockMvc.perform(get("/api/users").with(asSeller()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("DELETE /api/users/{id} as SELLER -> 403")
+        void deleteUser_asSeller_returns403() throws Exception {
+            mockMvc.perform(delete("/api/users/1").with(asSeller()))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("PATCH /api/users/{id}/role as SELLER -> 403")
+        void changeRole_asSeller_returns403() throws Exception {
+            mockMvc.perform(patch("/api/users/1/role")
+                            .with(asSeller())
+                            .param("role", "ADMIN"))
+                    .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("GET /actuator/metrics as SELLER -> 403")
+        void actuatorMetrics_asSeller_returns403() throws Exception {
+            mockMvc.perform(get("/actuator/metrics").with(asSeller()))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
 }

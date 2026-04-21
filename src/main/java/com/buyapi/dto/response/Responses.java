@@ -1,10 +1,16 @@
 package com.buyapi.dto.response;
 
-import com.buyapi.entity.*;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
+import com.buyapi.entity.Cart;
+import com.buyapi.entity.CartItem;
+import com.buyapi.entity.Category;
+import com.buyapi.entity.Order;
+import com.buyapi.entity.OrderItem;
+import com.buyapi.entity.Product;
+import com.buyapi.entity.User;
 
 public class Responses {
 
@@ -35,12 +41,13 @@ public class Responses {
 
     public record ProductResponse(Long id, String name, String description, BigDecimal price,
                                   Integer stock, String imageUrl, boolean active,
-                                  CategoryResponse category, Instant createdAt) {
+                                  CategoryResponse category, Long sellerId, Instant createdAt) {
         public static ProductResponse from(Product p) {
             return new ProductResponse(
                     p.getId(), p.getName(), p.getDescription(), p.getPrice(),
                     p.getStock(), p.getImageUrl(), p.isActive(),
                     p.getCategory() != null ? CategoryResponse.fromShallow(p.getCategory()) : null,
+                    p.getSeller() != null ? p.getSeller().getId() : null,
                     p.getCreatedAt()
             );
         }

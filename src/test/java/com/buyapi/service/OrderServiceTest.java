@@ -285,7 +285,7 @@ class OrderServiceTest {
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenReturn(order);
 
-        OrderResponse response = orderService.updateStatus(1L, "shipped");
+        OrderResponse response = orderService.updateStatus(1L, "shipped", "admin@example.com", true, false);
 
         assertThat(order.getStatus()).isEqualTo(Order.Status.SHIPPED);
     }
@@ -296,7 +296,7 @@ class OrderServiceTest {
 
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.updateStatus(1L, "INVALID"))
+        assertThatThrownBy(() -> orderService.updateStatus(1L, "INVALID", "admin@example.com", true, false))
                 .isInstanceOf(BadRequestException.class);
     }
 
@@ -315,7 +315,7 @@ class OrderServiceTest {
         when(productRepository.save(any())).thenReturn(product);
         when(orderRepository.save(any())).thenReturn(order);
 
-        orderService.cancelOrder(1L, "user@example.com", false);
+        orderService.cancelOrder(1L, "user@example.com", false, false);
 
         assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
         assertThat(product.getStock()).isEqualTo(13);
@@ -330,7 +330,7 @@ class OrderServiceTest {
 
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(1L, "user@example.com", false))
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "user@example.com", false, false))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("already been shipped");
     }
@@ -347,7 +347,7 @@ class OrderServiceTest {
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
         when(orderRepository.save(any())).thenReturn(order);
 
-        orderService.cancelOrder(1L, "admin@example.com", true);
+        orderService.cancelOrder(1L, "admin@example.com", true, false);
 
         assertThat(order.getStatus()).isEqualTo(Order.Status.CANCELLED);
     }
@@ -363,7 +363,7 @@ class OrderServiceTest {
 
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(1L, "user@example.com", false))
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "user@example.com", false, false))
                 .isInstanceOf(BadRequestException.class);
     }
 
@@ -381,7 +381,111 @@ class OrderServiceTest {
 
         when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
 
-        assertThatThrownBy(() -> orderService.cancelOrder(1L, "other@example.com", false))
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "other@example.com", false, false))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void cancelOrder_seller_allItemsOwned_succeeds() {
+        User seller = User.builder().id(2L).email("seller@example.com")
+                .fullName("Seller").role(User.Role.SELLER).build();
+        Product p = Product.builder().id(1L).name("Widget")
+                .price(new java.math.BigDecimal("10.00")).stock(5).active(true)
+                .seller(seller).build();
+        OrderItem item = OrderItem.builder().id(1L).product(p).quantity(2)
+                .unitPrice(p.getPrice()).build();
+        Order order = Order.builder().id(1L).user(sampleUser())
+                .status(Order.Status.PENDING).items(new java.util.ArrayList<>(List.of(item)))
+                .totalAmount(new java.math.BigDecimal("20.00")).build();
+        item.setOrder(order);
+
+        when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = orderService.cancelOrder(1L, "seller@example.com", false, true);
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void cancelOrder_seller_itemBelongsToDifferentSeller_throwsAccessDenied() {
+        User otherSeller = User.builder().id(3L).email("other@example.com")
+                .fullName("Other").role(User.Role.SELLER).build();
+        Product p = Product.builder().id(1L).name("Widget")
+                .price(new java.math.BigDecimal("10.00")).stock(5).active(true)
+                .seller(otherSeller).build();
+        OrderItem item = OrderItem.builder().id(1L).product(p).quantity(1)
+                .unitPrice(p.getPrice()).build();
+        Order order = Order.builder().id(1L).user(sampleUser())
+                .status(Order.Status.PENDING).items(List.of(item))
+                .totalAmount(new java.math.BigDecimal("10.00")).build();
+        item.setOrder(order);
+
+        when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "seller@example.com", false, true))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void cancelOrder_seller_productHasNoSeller_throwsAccessDenied() {
+        Product p = Product.builder().id(1L).name("Widget")
+                .price(new java.math.BigDecimal("10.00")).stock(5).active(true)
+                .seller(null).build();
+        OrderItem item = OrderItem.builder().id(1L).product(p).quantity(1)
+                .unitPrice(p.getPrice()).build();
+        Order order = Order.builder().id(1L).user(sampleUser())
+                .status(Order.Status.PENDING).items(List.of(item))
+                .totalAmount(new java.math.BigDecimal("10.00")).build();
+        item.setOrder(order);
+
+        when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(1L, "seller@example.com", false, true))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void updateStatus_seller_allItemsOwned_succeeds() {
+        User seller = User.builder().id(2L).email("seller@example.com")
+                .fullName("Seller").role(User.Role.SELLER).build();
+        Product p = Product.builder().id(1L).name("Widget")
+                .price(new java.math.BigDecimal("10.00")).stock(5).active(true)
+                .seller(seller).build();
+        OrderItem item = OrderItem.builder().id(1L).product(p).quantity(1)
+                .unitPrice(p.getPrice()).build();
+        Order order = Order.builder().id(1L).user(sampleUser())
+                .status(Order.Status.PENDING).items(List.of(item))
+                .totalAmount(new java.math.BigDecimal("10.00")).build();
+        item.setOrder(order);
+
+        when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderResponse response = orderService.updateStatus(1L, "SHIPPED", "seller@example.com", false, true);
+
+        assertThat(response.status()).isEqualTo("SHIPPED");
+    }
+
+    @Test
+    void updateStatus_seller_itemBelongsToDifferentSeller_throwsAccessDenied() {
+        User otherSeller = User.builder().id(3L).email("other@example.com")
+                .fullName("Other").role(User.Role.SELLER).build();
+        Product p = Product.builder().id(1L).name("Widget")
+                .price(new java.math.BigDecimal("10.00")).stock(5).active(true)
+                .seller(otherSeller).build();
+        OrderItem item = OrderItem.builder().id(1L).product(p).quantity(1)
+                .unitPrice(p.getPrice()).build();
+        Order order = Order.builder().id(1L).user(sampleUser())
+                .status(Order.Status.PENDING).items(List.of(item))
+                .totalAmount(new java.math.BigDecimal("10.00")).build();
+        item.setOrder(order);
+
+        when(orderRepository.findWithItemsById(1L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() ->
+                orderService.updateStatus(1L, "SHIPPED", "seller@example.com", false, true))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 }

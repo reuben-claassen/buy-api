@@ -1,28 +1,33 @@
 package com.buyapi.service.impl;
 
-import com.buyapi.dto.request.ProductRequest;
-import com.buyapi.dto.response.Responses.PageResponse;
-import com.buyapi.dto.response.Responses.ProductResponse;
-import com.buyapi.entity.Category;
-import com.buyapi.entity.Product;
-import com.buyapi.exception.BadRequestException;
-import com.buyapi.exception.ResourceNotFoundException;
-import com.buyapi.repository.CategoryRepository;
-import com.buyapi.repository.ProductRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.buyapi.dto.request.ProductRequest;
+import com.buyapi.dto.response.Responses.PageResponse;
+import com.buyapi.dto.response.Responses.ProductResponse;
+import com.buyapi.entity.Category;
+import com.buyapi.entity.Product;
+import com.buyapi.entity.User;
+import com.buyapi.exception.BadRequestException;
+import com.buyapi.exception.ResourceNotFoundException;
+import com.buyapi.repository.CategoryRepository;
+import com.buyapi.repository.ProductRepository;
+import com.buyapi.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -31,6 +36,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final UserRepository userRepository;
     private final Path uploadPath;
 
     @Transactional(readOnly = true)
@@ -50,7 +56,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponse create(ProductRequest request) {
+    public ProductResponse create(ProductRequest request, String sellerEmail) {
         Product product = Product.builder()
                 .name(request.name())
                 .description(request.description())
@@ -60,12 +66,17 @@ public class ProductService {
         if (request.categoryId() != null) {
             product.setCategory(findCategory(request.categoryId()));
         }
+        if (sellerEmail != null) {
+            User seller = userRepository.findByEmail(sellerEmail)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + sellerEmail));
+            product.setSeller(seller);
+        }
         return ProductResponse.from(productRepository.save(product));
     }
 
     @Transactional
-    public ProductResponse update(Long id, ProductRequest request) {
-        Product product = findOrThrow(id);
+    public ProductResponse update(Long id, ProductRequest request, String callerEmail, boolean isAdmin) {
+        Product product = isAdmin ? findOrThrow(id) : findOwnedOrThrow(id, callerEmail);
         product.setName(request.name());
         product.setDescription(request.description());
         product.setPrice(request.price());
@@ -79,8 +90,9 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductResponse uploadImage(Long id, MultipartFile file) throws IOException {
-        Product product = findOrThrow(id);
+    public ProductResponse uploadImage(Long id, MultipartFile file, String callerEmail, boolean isAdmin)
+            throws IOException {
+        Product product = isAdmin ? findOrThrow(id) : findOwnedOrThrow(id, callerEmail);
 
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
@@ -108,6 +120,14 @@ public class ProductService {
     private Product findOrThrow(Long id) {
         return productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+    }
+
+    private Product findOwnedOrThrow(Long id, String sellerEmail) {
+        Product product = findOrThrow(id);
+        if (product.getSeller() == null || !product.getSeller().getEmail().equals(sellerEmail)) {
+            throw new AccessDeniedException("You do not own this product");
+        }
+        return product;
     }
 
     private Category findCategory(Long id) {

@@ -14,6 +14,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -51,16 +53,26 @@ public class ProductController {
     @Operation(summary = "Create product")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
-    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(productService.create(request));
+    public ResponseEntity<ProductResponse> create(
+            @Valid @RequestBody ProductRequest request,
+            @AuthenticationPrincipal UserDetails caller) {
+        boolean isSeller = caller != null && caller.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SELLER"));
+        String sellerEmail = isSeller ? caller.getUsername() : null;
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(productService.create(request, sellerEmail));
     }
 
     @Operation(summary = "Update product")
     @SecurityRequirement(name = "bearerAuth")
     @PutMapping("/{id}")
-    public ResponseEntity<ProductResponse> update(@PathVariable Long id,
-                                                  @Valid @RequestBody ProductRequest request) {
-        return ResponseEntity.ok(productService.update(id, request));
+    public ResponseEntity<ProductResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductRequest request,
+            @AuthenticationPrincipal UserDetails caller) {
+        boolean isAdmin = caller.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(productService.update(id, request, caller.getUsername(), isAdmin));
     }
 
     @Operation(
@@ -69,10 +81,13 @@ public class ProductController {
     )
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ProductResponse> uploadImage(@PathVariable Long id,
-                                                       @RequestParam("file") MultipartFile file)
-            throws IOException {
-        return ResponseEntity.ok(productService.uploadImage(id, file));
+    public ResponseEntity<ProductResponse> uploadImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserDetails caller) throws IOException {
+        boolean isAdmin = caller.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(productService.uploadImage(id, file, caller.getUsername(), isAdmin));
     }
 
     @Operation(summary = "Delete product")
