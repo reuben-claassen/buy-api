@@ -47,7 +47,7 @@ class CartControllerTest {
 
     private CartResponse cartWithItem() {
         CartItemResponse item = new CartItemResponse(
-                10L, 5L, "Widget", new BigDecimal("9.99"), 2, new BigDecimal("19.98"));
+                10L, 5L, "Widget", new BigDecimal("9.99"), 2, new BigDecimal("19.98"), 20);
         return new CartResponse(1L, List.of(item), new BigDecimal("19.98"));
     }
 

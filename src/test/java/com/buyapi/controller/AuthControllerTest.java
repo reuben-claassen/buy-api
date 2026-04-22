@@ -42,7 +42,7 @@ class AuthControllerTest {
         AuthRequest.Register request = new AuthRequest.Register(
                 "jane@example.com", "securePass1", "Jane Doe");
 
-        AuthResponse response = new AuthResponse("jwt-token", "jane@example.com", "Jane Doe", "CUSTOMER");
+        AuthResponse response = new AuthResponse("jwt-token", 1L, "jane@example.com", "Jane Doe", "CUSTOMER");
         given(authService.register(any(AuthRequest.Register.class))).willReturn(response);
 
         mockMvc.perform(post("/api/auth/register")
@@ -50,6 +50,7 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.email").value("jane@example.com"))
                 .andExpect(jsonPath("$.fullName").value("Jane Doe"))
                 .andExpect(jsonPath("$.role").value("CUSTOMER"));
@@ -99,7 +100,7 @@ class AuthControllerTest {
     void login_validCredentials_returns200WithToken() throws Exception {
         AuthRequest.Login request = new AuthRequest.Login("jane@example.com", "securePass1");
 
-        AuthResponse response = new AuthResponse("jwt-token", "jane@example.com", "Jane Doe", "CUSTOMER");
+        AuthResponse response = new AuthResponse("jwt-token", 1L, "jane@example.com", "Jane Doe", "CUSTOMER");
         given(authService.login(any(AuthRequest.Login.class))).willReturn(response);
 
         mockMvc.perform(post("/api/auth/login")
@@ -107,6 +108,7 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.email").value("jane@example.com"));
     }
 
@@ -133,7 +135,7 @@ class AuthControllerTest {
     @Test
     void authEndpoints_arePublic_noTokenRequired() throws Exception {
         given(authService.login(any())).willReturn(
-                new AuthResponse("t", "e@e.com", "E", "CUSTOMER"));
+                new AuthResponse("t", 1L, "e@e.com", "E", "CUSTOMER"));
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

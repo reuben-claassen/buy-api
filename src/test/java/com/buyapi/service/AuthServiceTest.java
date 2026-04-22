@@ -72,6 +72,7 @@ class AuthServiceTest {
         AuthResponse response = authService.register(registerRequest);
 
         assertThat(response.token()).isEqualTo("jwt-token");
+        assertThat(response.id()).isEqualTo(1L);
         assertThat(response.email()).isEqualTo("test@example.com");
         assertThat(response.role()).isEqualTo("CUSTOMER");
         verify(cartRepository).save(any(Cart.class));
@@ -106,6 +107,7 @@ class AuthServiceTest {
         AuthResponse response = authService.login(new AuthRequest.Login("test@example.com", "password123"));
 
         assertThat(response.token()).isEqualTo("jwt-token");
+        assertThat(response.id()).isEqualTo(1L);
         assertThat(response.email()).isEqualTo("test@example.com");
     }
 }

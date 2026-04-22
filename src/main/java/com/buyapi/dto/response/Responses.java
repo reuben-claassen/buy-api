@@ -14,7 +14,7 @@ import com.buyapi.entity.User;
 
 public class Responses {
 
-    public record AuthResponse(String token, String email, String fullName, String role) {}
+    public record AuthResponse(String token, Long id, String email, String fullName, String role) {}
 
     public record UserResponse(Long id, String email, String fullName, String role, Instant createdAt) {
         public static UserResponse from(User u) {
@@ -65,11 +65,11 @@ public class Responses {
     }
 
     public record CartItemResponse(Long id, Long productId, String productName,
-                                   BigDecimal unitPrice, Integer quantity, BigDecimal subtotal) {
+                                   BigDecimal unitPrice, Integer quantity, BigDecimal subtotal, Integer stock) {
         public static CartItemResponse from(CartItem ci) {
             return new CartItemResponse(
                     ci.getId(), ci.getProduct().getId(), ci.getProduct().getName(),
-                    ci.getProduct().getPrice(), ci.getQuantity(), ci.getSubtotal()
+                    ci.getProduct().getPrice(), ci.getQuantity(), ci.getSubtotal(), ci.getProduct().getStock()
             );
         }
     }

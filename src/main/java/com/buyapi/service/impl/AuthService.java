@@ -49,7 +49,7 @@ public class AuthService {
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
         String token = jwtUtils.generateToken((UserDetails) auth.getPrincipal());
-        return new AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name());
+        return new AuthResponse(token, user.getId(), user.getEmail(), user.getFullName(), user.getRole().name());
     }
 
     public AuthResponse login(AuthRequest.Login request) {
@@ -60,6 +60,6 @@ public class AuthService {
         UserDetails details = (UserDetails) auth.getPrincipal();
         User user = userRepository.findByEmail(details.getUsername()).orElseThrow();
         String token = jwtUtils.generateToken(details);
-        return new AuthResponse(token, user.getEmail(), user.getFullName(), user.getRole().name());
+        return new AuthResponse(token, user.getId(), user.getEmail(), user.getFullName(), user.getRole().name());
     }
 }
