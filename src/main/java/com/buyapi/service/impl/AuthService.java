@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,11 +35,13 @@ public class AuthService {
             throw new BadRequestException("Email already in use: " + request.email());
         }
 
+        User.Role role = resolveRole(request.role());
+
         User user = User.builder()
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName())
-                .role(User.Role.CUSTOMER)
+                .role(role)
                 .build();
 
         userRepository.save(user);
@@ -61,5 +65,27 @@ public class AuthService {
         User user = userRepository.findByEmail(details.getUsername()).orElseThrow();
         String token = jwtUtils.generateToken(details);
         return new AuthResponse(token, user.getId(), user.getEmail(), user.getFullName(), user.getRole().name());
+    }
+
+    private User.Role resolveRole(String requestedRole) {
+        if (requestedRole == null || requestedRole.isBlank()) {
+            return User.Role.CUSTOMER;
+        }
+
+        Authentication caller = SecurityContextHolder.getContext().getAuthentication();
+        boolean callerIsAdmin = caller != null && caller.isAuthenticated()
+                && caller.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .anyMatch(a -> a.equals("ROLE_ADMIN"));
+
+        if (!callerIsAdmin) {
+            return User.Role.CUSTOMER;
+        }
+
+        try {
+            return User.Role.valueOf(requestedRole.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid role: " + requestedRole + ". Valid values: CUSTOMER, SELLER, ADMIN");
+        }
     }
 }

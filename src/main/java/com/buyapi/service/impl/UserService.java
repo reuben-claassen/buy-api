@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.buyapi.dto.request.UserUpdateRequest;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.dto.response.Responses.UserResponse;
 import com.buyapi.entity.User;
@@ -44,21 +45,32 @@ public class UserService {
     }
 
     @Transactional
+    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User", id));
+
+        if (!user.getEmail().equalsIgnoreCase(request.email()) &&
+                userRepository.existsByEmail(request.email())) {
+            throw new BadRequestException("Email already in use: " + request.email());
+        }
+
+        try {
+            user.setRole(User.Role.valueOf(request.role().toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid role: " + request.role() + ". Valid values: CUSTOMER, SELLER, ADMIN");
+        }
+
+        user.setFullName(request.fullName());
+        user.setEmail(request.email());
+
+        return UserResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
     public void deleteUser(Long id) {
         if (!userRepository.existsById(id)) {
             throw new ResourceNotFoundException("User", id);
         }
         userRepository.deleteById(id);
-    }
-    @Transactional
-    public UserResponse changeRole(Long id, String role) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User", id));
-        try {
-            user.setRole(User.Role.valueOf(role.toUpperCase()));
-        } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Invalid role: " + role + ". Valid values: CUSTOMER, SELLER, ADMIN");
-        }
-        return UserResponse.from(userRepository.save(user));
     }
 }

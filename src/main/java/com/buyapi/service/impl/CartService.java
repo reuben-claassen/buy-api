@@ -1,5 +1,8 @@
 package com.buyapi.service.impl;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.buyapi.dto.request.CartItemRequest;
 import com.buyapi.dto.response.Responses.CartResponse;
 import com.buyapi.entity.Cart;
@@ -11,9 +14,8 @@ import com.buyapi.repository.CartItemRepository;
 import com.buyapi.repository.CartRepository;
 import com.buyapi.repository.ProductRepository;
 import com.buyapi.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -61,11 +63,10 @@ public class CartService {
         if (request.quantity() == 0) {
             cartItemRepository.delete(item);
         } else {
-            if (item.getProduct().getStock() < request.quantity()) {
+            if (request.quantity() > item.getQuantity() && item.getProduct().getStock() < request.quantity()) {
                 throw new BadRequestException("Insufficient stock");
             }
-            item.setQuantity(request.quantity());
-            cartItemRepository.save(item);
+            item.setQuantity(request.quantity());            cartItemRepository.save(item);
         }
 
         return CartResponse.from(findCartByEmail(email));
