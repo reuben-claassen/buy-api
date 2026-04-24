@@ -1,5 +1,6 @@
 package com.buyapi.service;
 
+import com.buyapi.dto.request.UserUpdateRequest;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.dto.response.Responses.UserResponse;
 import com.buyapi.entity.User;
@@ -117,6 +118,97 @@ class UserServiceTest {
     }
 
     @Test
+    void updateUser_validRequest_updatesAllFields() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userService.updateUser(1L,
+                new UserUpdateRequest("New Name", "new@example.com", "SELLER"));
+
+        assertThat(response.fullName()).isEqualTo("New Name");
+        assertThat(response.email()).isEqualTo("new@example.com");
+        assertThat(response.role()).isEqualTo("SELLER");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateUser_sameEmail_doesNotCheckUniqueness() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        userService.updateUser(1L,
+                new UserUpdateRequest("Updated Name", "alice@example.com", "CUSTOMER"));
+
+        verify(userRepository, never()).existsByEmail(any());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void updateUser_duplicateEmail_throwsBadRequest() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> userService.updateUser(1L,
+                new UserUpdateRequest("Alice", "taken@example.com", "CUSTOMER")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Email already in use");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUser_invalidRole_throwsBadRequest() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.updateUser(1L,
+                new UserUpdateRequest("Alice", "alice@example.com", "SUPERUSER")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Invalid role");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUser_lowercaseRole_isAccepted() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userService.updateUser(1L,
+                new UserUpdateRequest("Alice", "alice@example.com", "admin"));
+
+        assertThat(response.role()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void updateUser_unknownUser_throwsNotFound() {
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateUser(99L,
+                new UserUpdateRequest("Alice", "alice@example.com", "CUSTOMER")))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateUser_toAdminRole_updatesRole() {
+        User user = sampleUser(1L, "alice@example.com");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UserResponse response = userService.updateUser(1L,
+                new UserUpdateRequest("Alice", "alice@example.com", "ADMIN"));
+
+        assertThat(response.role()).isEqualTo("ADMIN");
+    }
+
+    @Test
     void deleteUser_existingUser_deletesSuccessfully() {
         when(userRepository.existsById(1L)).thenReturn(true);
 
@@ -144,67 +236,4 @@ class UserServiceTest {
         verify(userRepository, times(1)).deleteById(1L);
         verify(userRepository, never()).deleteById(argThat(id -> !id.equals(1L)));
     }
-
-    @Test
-    void changeRole_validRole_updatesAndReturnsUser() {
-        User user = sampleUser(1L, "alice@example.com");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UserResponse response = userService.changeRole(1L, "SELLER");
-
-        assertThat(response.role()).isEqualTo("SELLER");
-        verify(userRepository).save(user);
-    }
-
-    @Test
-    void changeRole_toAdmin_updatesRole() {
-        User user = sampleUser(1L, "alice@example.com");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UserResponse response = userService.changeRole(1L, "ADMIN");
-
-        assertThat(response.role()).isEqualTo("ADMIN");
-    }
-
-    @Test
-    void changeRole_lowercaseInput_isAccepted() {
-        User user = sampleUser(1L, "alice@example.com");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UserResponse response = userService.changeRole(1L, "seller");
-
-        assertThat(response.role()).isEqualTo("SELLER");
-    }
-
-    @Test
-    void changeRole_invalidRole_throwsBadRequest() {
-        User user = sampleUser(1L, "alice@example.com");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> userService.changeRole(1L, "SUPERUSER"))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessageContaining("Invalid role");
-    }
-
-    @Test
-    void changeRole_unknownUser_throwsNotFound() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> userService.changeRole(99L, "SELLER"))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
-
-    @Test
-    void changeRole_doesNotSaveOnInvalidRole() {
-        User user = sampleUser(1L, "alice@example.com");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-
-        assertThatThrownBy(() -> userService.changeRole(1L, "INVALID"));
-
-        verify(userRepository, never()).save(any());
-    }
-
 }

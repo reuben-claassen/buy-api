@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,7 +16,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -105,6 +105,67 @@ class UserControllerTest {
 
     @Test
     @WithMockUser(roles = "ADMIN")
+    void update_admin_returnsUpdatedUser() throws Exception {
+        UserResponse updated = new UserResponse(1L, "new@example.com", "New Name", "SELLER", Instant.now());
+        given(userService.updateUser(eq(1L), any())).willReturn(updated);
+
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\",\"email\":\"new@example.com\",\"role\":\"SELLER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("New Name"))
+                .andExpect(jsonPath("$.email").value("new@example.com"))
+                .andExpect(jsonPath("$.role").value("SELLER"));
+
+        verify(userService).updateUser(eq(1L), any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void update_missingRequiredField_returns400() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void update_invalidEmail_returns400() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\",\"email\":\"not-an-email\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "CUSTOMER")
+    void update_nonAdminRole_returns403() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\",\"email\":\"jane@example.com\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "SELLER")
+    void update_seller_returns403() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\",\"email\":\"jane@example.com\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void update_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"New Name\",\"email\":\"jane@example.com\",\"role\":\"CUSTOMER\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
     void delete_admin_returns204() throws Exception {
         mockMvc.perform(delete("/api/users/1"))
                 .andExpect(status().isNoContent());
@@ -124,38 +185,4 @@ class UserControllerTest {
         mockMvc.perform(delete("/api/users/1"))
                 .andExpect(status().isUnauthorized());
     }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void changeRole_admin_returnsUpdatedUser() throws Exception {
-        given(userService.changeRole(1L, "SELLER"))
-                .willReturn(new UserResponse(1L, "jane@example.com", "Jane Doe", "SELLER", java.time.Instant.now()));
-
-        mockMvc.perform(patch("/api/users/1/role").param("role", "SELLER"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("SELLER"));
-
-        verify(userService).changeRole(1L, "SELLER");
-    }
-
-    @Test
-    @WithMockUser(roles = "SELLER")
-    void changeRole_seller_returns403() throws Exception {
-        mockMvc.perform(patch("/api/users/1/role").param("role", "CUSTOMER"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "CUSTOMER")
-    void changeRole_customer_returns403() throws Exception {
-        mockMvc.perform(patch("/api/users/1/role").param("role", "ADMIN"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    void changeRole_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(patch("/api/users/1/role").param("role", "SELLER"))
-                .andExpect(status().isUnauthorized());
-    }
-
 }

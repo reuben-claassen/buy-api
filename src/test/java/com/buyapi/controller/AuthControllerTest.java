@@ -40,7 +40,7 @@ class AuthControllerTest {
     @Test
     void register_validRequest_returns201WithToken() throws Exception {
         AuthRequest.Register request = new AuthRequest.Register(
-                "jane@example.com", "securePass1", "Jane Doe");
+                "jane@example.com", "securePass1", "Jane Doe", null);
 
         AuthResponse response = new AuthResponse("jwt-token", 1L, "jane@example.com", "Jane Doe", "CUSTOMER");
         given(authService.register(any(AuthRequest.Register.class))).willReturn(response);
@@ -57,8 +57,23 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_withRoleField_returns201() throws Exception {
+        AuthRequest.Register request = new AuthRequest.Register(
+                "jane@example.com", "securePass1", "Jane Doe", "SELLER");
+
+        AuthResponse response = new AuthResponse("jwt-token", 1L, "jane@example.com", "Jane Doe", "SELLER");
+        given(authService.register(any(AuthRequest.Register.class))).willReturn(response);
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.role").value("SELLER"));
+    }
+
+    @Test
     void register_blankEmail_returns400() throws Exception {
-        AuthRequest.Register request = new AuthRequest.Register("", "securePass1", "Jane Doe");
+        AuthRequest.Register request = new AuthRequest.Register("", "securePass1", "Jane Doe", null);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,7 +83,7 @@ class AuthControllerTest {
 
     @Test
     void register_invalidEmail_returns400() throws Exception {
-        AuthRequest.Register request = new AuthRequest.Register("not-an-email", "securePass1", "Jane Doe");
+        AuthRequest.Register request = new AuthRequest.Register("not-an-email", "securePass1", "Jane Doe", null);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -78,7 +93,7 @@ class AuthControllerTest {
 
     @Test
     void register_shortPassword_returns400() throws Exception {
-        AuthRequest.Register request = new AuthRequest.Register("jane@example.com", "short", "Jane Doe");
+        AuthRequest.Register request = new AuthRequest.Register("jane@example.com", "short", "Jane Doe", null);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -88,7 +103,7 @@ class AuthControllerTest {
 
     @Test
     void register_blankFullName_returns400() throws Exception {
-        AuthRequest.Register request = new AuthRequest.Register("jane@example.com", "securePass1", "");
+        AuthRequest.Register request = new AuthRequest.Register("jane@example.com", "securePass1", "", null);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

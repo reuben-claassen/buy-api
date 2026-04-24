@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -46,18 +47,21 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        registerRequest = new AuthRequest.Register("test@example.com", "password123", "Test User");
+        SecurityContextHolder.clearContext();
+        registerRequest = new AuthRequest.Register("test@example.com", "password123", "Test User", null);
     }
 
-    @Test
-    void register_createsUserAndCart_returnsToken() {
+    private UsernamePasswordAuthenticationToken stubAuthManager(String email, String role) {
         UserDetails springUser = new org.springframework.security.core.userdetails.User(
-                "test@example.com", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
-
-        UsernamePasswordAuthenticationToken authToken =
+                email, "hashed",
+                List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+        UsernamePasswordAuthenticationToken token =
                 new UsernamePasswordAuthenticationToken(springUser, null, springUser.getAuthorities());
+        when(authManager.authenticate(any())).thenReturn(token);
+        return token;
+    }
 
+    private void stubSaveUser() {
         when(userRepository.existsByEmail(anyString())).thenReturn(false);
         when(passwordEncoder.encode(anyString())).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
@@ -66,8 +70,13 @@ class AuthServiceTest {
             return u;
         });
         when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(authManager.authenticate(any())).thenReturn(authToken);
         when(jwtUtils.generateToken(any())).thenReturn("jwt-token");
+    }
+
+    @Test
+    void register_noRoleProvided_defaultsToCustomer() {
+        stubSaveUser();
+        stubAuthManager("test@example.com", "CUSTOMER");
 
         AuthResponse response = authService.register(registerRequest);
 
@@ -76,6 +85,58 @@ class AuthServiceTest {
         assertThat(response.email()).isEqualTo("test@example.com");
         assertThat(response.role()).isEqualTo("CUSTOMER");
         verify(cartRepository).save(any(Cart.class));
+    }
+
+    @Test
+    void register_roleProvidedByUnauthenticatedCaller_isIgnoredDefaultsToCustomer() {
+        stubSaveUser();
+        stubAuthManager("test@example.com", "CUSTOMER");
+
+        AuthRequest.Register req = new AuthRequest.Register(
+                "test@example.com", "password123", "Test User", "ADMIN");
+
+        AuthResponse response = authService.register(req);
+
+        assertThat(response.role()).isEqualTo("CUSTOMER");
+    }
+
+    @Test
+    void register_roleProvidedByAdmin_isHonoured() {
+        UserDetails adminDetails = new org.springframework.security.core.userdetails.User(
+                "admin@example.com", "hashed",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        UsernamePasswordAuthenticationToken adminAuth =
+                new UsernamePasswordAuthenticationToken(adminDetails, null, adminDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(adminAuth);
+
+        stubSaveUser();
+        stubAuthManager("test@example.com", "SELLER");
+
+        AuthRequest.Register req = new AuthRequest.Register(
+                "test@example.com", "password123", "Test User", "SELLER");
+
+        AuthResponse response = authService.register(req);
+
+        assertThat(response.role()).isEqualTo("SELLER");
+    }
+
+    @Test
+    void register_invalidRoleProvidedByAdmin_throwsBadRequest() {
+        UserDetails adminDetails = new org.springframework.security.core.userdetails.User(
+                "admin@example.com", "hashed",
+                List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        UsernamePasswordAuthenticationToken adminAuth =
+                new UsernamePasswordAuthenticationToken(adminDetails, null, adminDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(adminAuth);
+
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+
+        AuthRequest.Register req = new AuthRequest.Register(
+                "test@example.com", "password123", "Test User", "SUPERUSER");
+
+        assertThatThrownBy(() -> authService.register(req))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Invalid role");
     }
 
     @Test
@@ -93,14 +154,7 @@ class AuthServiceTest {
                 .id(1L).email("test@example.com").password("hashed")
                 .fullName("Test User").role(User.Role.CUSTOMER).build();
 
-        UserDetails springUser = new org.springframework.security.core.userdetails.User(
-                "test@example.com", "hashed",
-                List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER")));
-
-        UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(springUser, null, springUser.getAuthorities());
-
-        when(authManager.authenticate(any())).thenReturn(authToken);
+        stubAuthManager("test@example.com", "CUSTOMER");
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(jwtUtils.generateToken(any())).thenReturn("jwt-token");
 

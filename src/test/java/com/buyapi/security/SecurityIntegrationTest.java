@@ -15,7 +15,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -467,11 +466,11 @@ class SecurityIntegrationTest {
         }
 
         @Test
-        @DisplayName("PATCH /api/users/{id}/role as SELLER -> 403")
-        void changeRole_asSeller_returns403() throws Exception {
-            mockMvc.perform(patch("/api/users/1/role")
-                            .with(asSeller())
-                            .param("role", "ADMIN"))
+        @DisplayName("PUT /api/users/{id} as SELLER -> 403")
+        void updateUser_asSeller_returns403() throws Exception {
+            mockMvc.perform(put("/api/users/1").with(asSeller())
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                            .content("{\"fullName\":\"Jane\",\"email\":\"jane@example.com\",\"role\":\"CUSTOMER\"}"))
                     .andExpect(status().isForbidden());
         }
 
