@@ -2,6 +2,7 @@ package com.buyapi.controller;
 
 import com.buyapi.config.WebMvcTestSecurityConfig;
 import com.buyapi.dto.request.OrderRequest;
+import com.buyapi.dto.request.OrderStatusRequest;
 import com.buyapi.dto.response.Responses.OrderResponse;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.service.impl.OrderService;
@@ -200,7 +201,9 @@ class OrderControllerTest {
     void updateStatus_admin_returnsOk() throws Exception {
         given(orderService.updateStatus(eq(1L), eq("SHIPPED"), any(), eq(true), eq(false))).willReturn(sampleOrder(1L, "SHIPPED"));
 
-        mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
+        mockMvc.perform(put("/api/orders/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequest("SHIPPED"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SHIPPED"));
 
@@ -210,13 +213,17 @@ class OrderControllerTest {
     @Test
     @WithMockUser(roles = "CUSTOMER")
     void updateStatus_nonAdminRole_returns403() throws Exception {
-        mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
+        mockMvc.perform(put("/api/orders/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequest("SHIPPED"))))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void updateStatus_unauthenticated_returns401() throws Exception {
-        mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
+        mockMvc.perform(put("/api/orders/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequest("SHIPPED"))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -238,7 +245,9 @@ class OrderControllerTest {
         given(orderService.updateStatus(eq(1L), eq("SHIPPED"), eq("seller@example.com"), eq(false), eq(true)))
                 .willReturn(sampleOrder(1L, "SHIPPED"));
 
-        mockMvc.perform(put("/api/orders/1/status").param("status", "SHIPPED"))
+        mockMvc.perform(put("/api/orders/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequest("SHIPPED"))))
                 .andExpect(status().isOk());
 
         verify(orderService).updateStatus(eq(1L), eq("SHIPPED"), eq("seller@example.com"), eq(false), eq(true));

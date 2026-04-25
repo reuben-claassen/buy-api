@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.buyapi.dto.request.UserUpdateRequest;
+import com.buyapi.dto.request.UserRequest;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.dto.response.Responses.UserResponse;
 import com.buyapi.service.impl.UserService;
@@ -62,7 +62,7 @@ public class UserController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> update(@PathVariable Long id,
-            @Valid @RequestBody UserUpdateRequest request) {
+            @Valid @RequestBody UserRequest request) {
         return ResponseEntity.ok(userService.updateUser(id, request));
     }
 

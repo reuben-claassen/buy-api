@@ -5,7 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.buyapi.dto.request.UserUpdateRequest;
+import com.buyapi.dto.request.UserRequest;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.dto.response.Responses.UserResponse;
 import com.buyapi.entity.User;
@@ -45,7 +45,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateUser(Long id, UserUpdateRequest request) {
+    public UserResponse updateUser(Long id, UserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
 

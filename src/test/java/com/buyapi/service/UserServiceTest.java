@@ -1,6 +1,6 @@
 package com.buyapi.service;
 
-import com.buyapi.dto.request.UserUpdateRequest;
+import com.buyapi.dto.request.UserRequest;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.dto.response.Responses.UserResponse;
 import com.buyapi.entity.User;
@@ -125,7 +125,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UserResponse response = userService.updateUser(1L,
-                new UserUpdateRequest("New Name", "new@example.com", "SELLER"));
+                new UserRequest("New Name", "new@example.com", "SELLER"));
 
         assertThat(response.fullName()).isEqualTo("New Name");
         assertThat(response.email()).isEqualTo("new@example.com");
@@ -140,7 +140,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         userService.updateUser(1L,
-                new UserUpdateRequest("Updated Name", "alice@example.com", "CUSTOMER"));
+                new UserRequest("Updated Name", "alice@example.com", "CUSTOMER"));
 
         verify(userRepository, never()).existsByEmail(any());
         verify(userRepository).save(user);
@@ -153,7 +153,7 @@ class UserServiceTest {
         when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> userService.updateUser(1L,
-                new UserUpdateRequest("Alice", "taken@example.com", "CUSTOMER")))
+                new UserRequest("Alice", "taken@example.com", "CUSTOMER")))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Email already in use");
 
@@ -166,7 +166,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> userService.updateUser(1L,
-                new UserUpdateRequest("Alice", "alice@example.com", "SUPERUSER")))
+                new UserRequest("Alice", "alice@example.com", "SUPERUSER")))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Invalid role");
 
@@ -180,7 +180,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UserResponse response = userService.updateUser(1L,
-                new UserUpdateRequest("Alice", "alice@example.com", "admin"));
+                new UserRequest("Alice", "alice@example.com", "admin"));
 
         assertThat(response.role()).isEqualTo("ADMIN");
     }
@@ -190,7 +190,7 @@ class UserServiceTest {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.updateUser(99L,
-                new UserUpdateRequest("Alice", "alice@example.com", "CUSTOMER")))
+                new UserRequest("Alice", "alice@example.com", "CUSTOMER")))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(userRepository, never()).save(any());
@@ -203,7 +203,7 @@ class UserServiceTest {
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UserResponse response = userService.updateUser(1L,
-                new UserUpdateRequest("Alice", "alice@example.com", "ADMIN"));
+                new UserRequest("Alice", "alice@example.com", "ADMIN"));
 
         assertThat(response.role()).isEqualTo("ADMIN");
     }

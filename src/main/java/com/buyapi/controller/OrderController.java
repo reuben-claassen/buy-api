@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.buyapi.dto.request.OrderRequest;
+import com.buyapi.dto.request.OrderStatusRequest;
 import com.buyapi.dto.response.Responses.OrderResponse;
 import com.buyapi.dto.response.Responses.PageResponse;
 import com.buyapi.service.impl.OrderService;
@@ -89,12 +90,12 @@ public class OrderController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'SELLER')")
     public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id,
-                                                      @RequestParam String status,
+                                                      @Valid @RequestBody OrderStatusRequest request,
                                                       @AuthenticationPrincipal UserDetails user) {
         boolean isAdmin = user.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         boolean isSeller = user.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_SELLER"));
-        return ResponseEntity.ok(orderService.updateStatus(id, status, user.getUsername(), isAdmin, isSeller));
+        return ResponseEntity.ok(orderService.updateStatus(id, request.status(), user.getUsername(), isAdmin, isSeller));
     }
 }
