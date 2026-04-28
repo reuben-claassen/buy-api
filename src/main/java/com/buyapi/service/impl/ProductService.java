@@ -1,10 +1,6 @@
 package com.buyapi.service.impl;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -37,7 +33,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
-    private final Path uploadPath;
+    private final SupabaseStorageService storageService;
 
     @Transactional(readOnly = true)
     public PageResponse<ProductResponse> search(String query, Long categoryId, Pageable pageable) {
@@ -100,13 +96,10 @@ public class ProductService {
         }
 
         String ext = getExtension(file.getOriginalFilename());
-        String filename = "product-" + id + "-" + UUID.randomUUID() + ext;
-        Path target = uploadPath.resolve(filename);
-        try (InputStream in = file.getInputStream()) {
-            Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
-        }
+        String path = "product-" + id + "-" + UUID.randomUUID() + ext;
+        String publicUrl = storageService.upload(path, file);
 
-        product.setImageUrl("/uploads/" + filename);
+        product.setImageUrl(publicUrl);
         return ProductResponse.from(productRepository.save(product));
     }
 
