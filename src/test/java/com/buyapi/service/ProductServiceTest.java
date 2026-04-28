@@ -4,25 +4,29 @@ import com.buyapi.dto.request.ProductRequest;
 import com.buyapi.dto.response.Responses.ProductResponse;
 import com.buyapi.entity.Product;
 import com.buyapi.entity.User;
+import com.buyapi.exception.BadRequestException;
 import com.buyapi.exception.ResourceNotFoundException;
 import com.buyapi.repository.CategoryRepository;
 import com.buyapi.repository.ProductRepository;
 import com.buyapi.repository.UserRepository;
+import com.buyapi.service.impl.ProductService;
+import com.buyapi.service.impl.SupabaseStorageService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-
-import com.buyapi.service.impl.ProductService;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -30,7 +34,7 @@ class ProductServiceTest {
     @Mock ProductRepository productRepository;
     @Mock CategoryRepository categoryRepository;
     @Mock UserRepository userRepository;
-    @Mock java.nio.file.Path uploadPath;
+    @Mock SupabaseStorageService storageService;
 
     @InjectMocks ProductService productService;
 
@@ -48,6 +52,8 @@ class ProductServiceTest {
     private ProductRequest validRequest() {
         return new ProductRequest("Widget", "desc", new BigDecimal("9.99"), 10, null);
     }
+
+    // ─── create ───────────────────────────────────────────────────────────────
 
     @Test
     void create_asSeller_setsSellerOnProduct() {
@@ -78,6 +84,8 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.create(validRequest(), "ghost@example.com"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    // ─── update ───────────────────────────────────────────────────────────────
 
     @Test
     void update_asAdmin_canUpdateAnyProduct() {
@@ -128,6 +136,99 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.update(99L, validRequest(), "admin@example.com", true))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    // ─── uploadImage ──────────────────────────────────────────────────────────
+
+    @Test
+    void uploadImage_asAdmin_uploadsToSupabaseAndSetsUrl() throws IOException {
+        Product p = product(1L, null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(storageService.upload(any(), any())).thenReturn("https://supabase.example.com/storage/v1/object/public/products/product-1-uuid.jpg");
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        ProductResponse response = productService.uploadImage(1L, file, "admin@example.com", true);
+
+        assertThat(response.imageUrl()).startsWith("https://supabase.example.com");
+        verify(storageService).upload(any(), eq(file));
+        verify(productRepository).save(p);
+    }
+
+    @Test
+    void uploadImage_asSeller_ownsProduct_succeeds() throws IOException {
+        User seller = seller(1L, "seller@example.com");
+        Product p = product(1L, seller);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(storageService.upload(any(), any())).thenReturn("https://supabase.example.com/storage/v1/object/public/products/product-1-uuid.jpg");
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1, 2, 3});
+
+        assertThatNoException().isThrownBy(
+                () -> productService.uploadImage(1L, file, "seller@example.com", false));
+
+        verify(storageService).upload(any(), eq(file));
+    }
+
+    @Test
+    void uploadImage_nonImageFile_throwsBadRequest() {
+        Product p = product(1L, null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(p));
+
+        MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> productService.uploadImage(1L, file, "admin@example.com", true))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("image");
+
+        verifyNoInteractions(storageService);
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadImage_storageFailure_propagatesException() throws IOException {
+        Product p = product(1L, null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(storageService.upload(any(), any())).thenThrow(new IOException("Network error"));
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1, 2, 3});
+
+        assertThatThrownBy(() -> productService.uploadImage(1L, file, "admin@example.com", true))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Network error");
+
+        verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadImage_pathContainsProductIdAndExtension() throws IOException {
+        Product p = product(1L, null);
+        when(productRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(storageService.upload(any(), any())).thenReturn("https://example.com/img.png");
+        when(productRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        MockMultipartFile file = new MockMultipartFile("file", "banner.png", "image/png", new byte[]{1});
+        productService.uploadImage(1L, file, "admin@example.com", true);
+
+        verify(storageService).upload(
+                argThat(path -> path.startsWith("product-1-") && path.endsWith(".png")),
+                eq(file)
+        );
+    }
+
+    @Test
+    void uploadImage_productNotFound_throwsNotFound() {
+        when(productRepository.findById(99L)).thenReturn(Optional.empty());
+
+        MockMultipartFile file = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[]{1});
+
+        assertThatThrownBy(() -> productService.uploadImage(99L, file, "admin@example.com", true))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(storageService);
+    }
+
+    // ─── delete ───────────────────────────────────────────────────────────────
 
     @Test
     void delete_existingProduct_softDeletes() {
