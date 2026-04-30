@@ -23,16 +23,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * @WebMvcTest slice for category endpoints.
+ * {@code @WebMvcTest} slice for category endpoints.
  *
- * Notes:
- * - URL-level role rules from SecurityConfig are NOT loaded in this slice — those
- *   are covered by SecurityIntegrationTest (e.g. CUSTOMER/unauthenticated blocked,
- *   SELLER blocked from delete).
- * - @WithMockUser is used to satisfy authenticated controller execution and to verify
- *   that SELLER is permitted to create/update via the SecurityConfig URL rules
- *   (confirmed in SecurityIntegrationTest) and service delegation here.
- * - ObjectMapper is instantiated manually (not auto-configured in this slice).
+ * URL-level role rules (e.g. blocking CUSTOMER and unauthenticated requests,
+ * restricting SELLER from delete) are validated in SecurityIntegrationTest.
+ * This slice focuses on controller behaviour and service delegation under
+ * an authenticated principal.
  */
 @WebMvcTest(controllers = CategoryController.class)
 @Import(WebMvcTestSecurityConfig.class)

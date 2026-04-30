@@ -25,12 +25,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * @WebMvcTest slice for cart endpoints.
+ * {@code @WebMvcTest} slice for cart endpoints.
  *
- * Notes:
- * - Uses @WithMockUser because endpoints rely on @AuthenticationPrincipal.
- * - Unauthenticated cases are not covered here (handled in integration tests).
- * - ObjectMapper is instantiated manually (not auto-configured in this slice).
+ * Endpoints use {@code @AuthenticationPrincipal}, so tests run under
+ * {@code @WithMockUser}. Full unauthenticated and security integration
+ * coverage lives in SecurityIntegrationTest.
  */
 @WebMvcTest(controllers = CartController.class)
 @Import(WebMvcTestSecurityConfig.class)

@@ -1,5 +1,9 @@
 package com.buyapi.exception;
 
+import java.net.URI;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -10,16 +14,11 @@ import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
-import java.net.URI;
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.assertThat;
-
 /**
  * Unit tests for {@link GlobalExceptionHandler}.
  *
- * Handlers are invoked directly (no Spring context).
- * Tests verify HTTP status, error type, message, and metadata.
+ * Handlers are invoked directly without a Spring context,
+ * verifying HTTP status codes, error types, and response metadata.
  */
 class GlobalExceptionHandlerTest {
 

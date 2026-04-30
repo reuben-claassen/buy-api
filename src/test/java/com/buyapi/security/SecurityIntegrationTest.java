@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -19,7 +20,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import org.springframework.mock.web.MockMultipartFile;
 
 import com.buyapi.service.impl.AuthService;
 import com.buyapi.service.impl.CartService;
@@ -32,9 +32,8 @@ import com.buyapi.service.impl.UserService;
 /**
  * Integration tests for URL-level security using the real SecurityFilterChain.
  *
- * Notes:
- * - Use .with(user(...)) instead of @WithMockUser because the JWT filter
- *   overrides the SecurityContext.
+ * Tests use {@code .with(user(...))} rather than {@code @WithMockUser} because
+ * the JWT filter runs before the security context is populated by the annotation.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

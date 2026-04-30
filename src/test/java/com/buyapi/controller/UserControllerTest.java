@@ -1,10 +1,13 @@
 package com.buyapi.controller;
 
-import com.buyapi.config.WebMvcTestSecurityConfig;
-import com.buyapi.dto.response.Responses.PageResponse;
-import com.buyapi.dto.response.Responses.UserResponse;
-import com.buyapi.service.impl.UserService;
+import java.time.Instant;
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -12,24 +15,23 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.Instant;
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import com.buyapi.config.WebMvcTestSecurityConfig;
+import com.buyapi.dto.response.Responses.PageResponse;
+import com.buyapi.dto.response.Responses.UserResponse;
+import com.buyapi.service.impl.UserService;
 
 /**
- * @WebMvcTest slice for user endpoints.
+ * {@code @WebMvcTest} slice for user endpoints.
  *
- * Notes:
- * - Method-level security (@PreAuthorize) is enforced.
- * - @WithMockUser is required for endpoints using @AuthenticationPrincipal.
- * - Role-based and unauthenticated access is validated here where applicable,
- *   with integration tests covering full security behaviour.
+ * Method-level security via {@code @PreAuthorize} is enforced. Endpoints
+ * using {@code @AuthenticationPrincipal} run under {@code @WithMockUser}.
+ * Full role-based and unauthenticated coverage lives in SecurityIntegrationTest.
  */
 @WebMvcTest(controllers = UserController.class)
 @Import(WebMvcTestSecurityConfig.class)
