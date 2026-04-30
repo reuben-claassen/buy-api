@@ -104,6 +104,13 @@ public class ProductService {
     }
 
     @Transactional
+    public ProductResponse removeImage(Long id, String callerEmail, boolean isAdmin) {
+        Product product = isAdmin ? findOrThrow(id) : findOwnedOrThrow(id, callerEmail);
+        product.setImageUrl(null);
+        return ProductResponse.from(productRepository.save(product));
+    }
+
+    @Transactional
     public void delete(Long id) {
         Product product = findOrThrow(id);
         product.setActive(false);

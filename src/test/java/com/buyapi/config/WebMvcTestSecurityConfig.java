@@ -1,6 +1,7 @@
 package com.buyapi.config;
 
-import com.buyapi.security.JwtUtils;
+import java.util.ArrayList;
+
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -8,22 +9,18 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter;
 
+import com.buyapi.security.JwtUtils;
+
 import jakarta.annotation.PostConstruct;
-import java.util.ArrayList;
 
 /**
- * Security configuration for @WebMvcTest slices.
+ * Security configuration for {@code @WebMvcTest} slices.
  *
- * Notes: - JwtAuthFilter is intentionally excluded. Tests use @WithMockUser /
- * .with(user(...)), and including the filter interferes with SecurityContext
- * propagation.
- *
- * - @EnableMethodSecurity is required to activate @PreAuthorize without loading
- * the full SecurityFilterChain.
- *
- * - AuthenticationPrincipalArgumentResolver is inserted at the start of the
- * argument resolver list. In Spring Boot 4, @WebMvcTest no longer registers it
- * early enough, causing @AuthenticationPrincipal to resolve incorrectly.
+ * JwtAuthFilter is excluded so tests can use {@code @WithMockUser} without
+ * interference. {@code @EnableMethodSecurity} activates {@code @PreAuthorize}
+ * without loading the full SecurityFilterChain. AuthenticationPrincipalArgumentResolver
+ * is registered early so {@code @AuthenticationPrincipal} resolves correctly in the
+ * test slice.
  */
 @TestConfiguration
 @EnableMethodSecurity

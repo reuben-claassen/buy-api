@@ -15,15 +15,18 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.mock.web.MockMultipartFile;
 
 import com.buyapi.service.impl.AuthService;
 import com.buyapi.service.impl.CartService;
 import com.buyapi.service.impl.CategoryService;
 import com.buyapi.service.impl.OrderService;
 import com.buyapi.service.impl.ProductService;
+import com.buyapi.service.impl.SupabaseStorageService;
 import com.buyapi.service.impl.UserService;
 
 /**
@@ -40,12 +43,13 @@ class SecurityIntegrationTest {
     @Autowired
     MockMvc mockMvc;
 
-    @MockitoBean AuthService     authService;
-    @MockitoBean ProductService  productService;
-    @MockitoBean CategoryService categoryService;
-    @MockitoBean CartService     cartService;
-    @MockitoBean OrderService    orderService;
-    @MockitoBean UserService     userService;
+    @MockitoBean AuthService            authService;
+    @MockitoBean ProductService         productService;
+    @MockitoBean CategoryService        categoryService;
+    @MockitoBean CartService            cartService;
+    @MockitoBean OrderService           orderService;
+    @MockitoBean UserService            userService;
+    @MockitoBean SupabaseStorageService storageService;
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor asUser() {
         return user("user@example.com")
@@ -428,7 +432,31 @@ class SecurityIntegrationTest {
         void updateOrderStatus_asSeller_passesSecurityGate() throws Exception {
             mockMvc.perform(put("/api/orders/1/status")
                             .with(asSeller())
-                            .param("status", "SHIPPED"))
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"SHIPPED\"}"))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("POST /api/products/{id}/image as SELLER -> not 403")
+        void uploadProductImage_asSeller_passesSecurityGate() throws Exception {
+            MockMultipartFile file = new MockMultipartFile(
+                    "file", "photo.jpg", "image/jpeg", "fake".getBytes());
+            mockMvc.perform(multipart("/api/products/1/image").file(file).with(asSeller()))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("DELETE /api/products/{id}/image as SELLER -> not 403")
+        void removeProductImage_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(delete("/api/products/1/image").with(asSeller()))
+                    .andExpect(status().is(not(equalTo(403))));
+        }
+
+        @Test
+        @DisplayName("POST /api/orders/{id}/cancel as SELLER -> not 403")
+        void cancelOrder_asSeller_passesSecurityGate() throws Exception {
+            mockMvc.perform(post("/api/orders/1/cancel").with(asSeller()))
                     .andExpect(status().is(not(equalTo(403))));
         }
     }

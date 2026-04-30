@@ -1,5 +1,27 @@
 package com.buyapi.service;
 
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.access.AccessDeniedException;
+
 import com.buyapi.dto.request.ProductRequest;
 import com.buyapi.dto.response.Responses.ProductResponse;
 import com.buyapi.entity.Product;
@@ -11,22 +33,6 @@ import com.buyapi.repository.ProductRepository;
 import com.buyapi.repository.UserRepository;
 import com.buyapi.service.impl.ProductService;
 import com.buyapi.service.impl.SupabaseStorageService;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.access.AccessDeniedException;
-
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
@@ -52,8 +58,6 @@ class ProductServiceTest {
     private ProductRequest validRequest() {
         return new ProductRequest("Widget", "desc", new BigDecimal("9.99"), 10, null);
     }
-
-    // ─── create ───────────────────────────────────────────────────────────────
 
     @Test
     void create_asSeller_setsSellerOnProduct() {
@@ -84,8 +88,6 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.create(validRequest(), "ghost@example.com"))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
-
-    // ─── update ───────────────────────────────────────────────────────────────
 
     @Test
     void update_asAdmin_canUpdateAnyProduct() {
@@ -136,8 +138,6 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.update(99L, validRequest(), "admin@example.com", true))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
-
-    // ─── uploadImage ──────────────────────────────────────────────────────────
 
     @Test
     void uploadImage_asAdmin_uploadsToSupabaseAndSetsUrl() throws IOException {
@@ -227,8 +227,6 @@ class ProductServiceTest {
 
         verifyNoInteractions(storageService);
     }
-
-    // ─── delete ───────────────────────────────────────────────────────────────
 
     @Test
     void delete_existingProduct_softDeletes() {

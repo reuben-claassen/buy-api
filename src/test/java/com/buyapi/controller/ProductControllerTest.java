@@ -30,11 +30,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @WebMvcTest slice for product endpoints.
  *
  * Notes:
- * - Method-level security (@PreAuthorize) is enforced in this slice via @EnableMethodSecurity.
- * - URL-level role rules from SecurityConfig are NOT loaded here — those are covered
- *   by SecurityIntegrationTest (e.g. CUSTOMER/unauthenticated blocked from write endpoints).
- * - create/update/uploadImage inject @AuthenticationPrincipal, so the service
- *   receives the caller's email and an isAdmin/isSeller flag derived from their role.
+ * - Access control is handled entirely by SecurityConfig URL-level rules 
+ *   and service-level ownership checks.
+ *   Role-based blocking (e.g. CUSTOMER/unauthenticated blocked from write endpoints)
+ *   is covered by SecurityIntegrationTest.
+ * - create/update/uploadImage/removeImage inject @AuthenticationPrincipal, so the
+ *   service receives the caller's email and an isAdmin/isSeller flag derived from
+ *   their role.
  * - ObjectMapper is instantiated manually (not auto-configured in this slice).
  */
 @WebMvcTest(controllers = ProductController.class)

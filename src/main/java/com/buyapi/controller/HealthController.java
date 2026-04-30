@@ -1,20 +1,21 @@
 package com.buyapi.controller;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+import java.time.Instant;
+import java.util.Map;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
-import java.util.Map;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
- * Simple keep-alive endpoint used by the GitHub Actions ping.
+ * Simple public health endpoint.
  *
- * Real health checks are handled by Spring Boot Actuator.
- * This exists only to provide a stable public URL without exposing full actuator details.
+ * Returns a lightweight status response without exposing full actuator details.
+ * Comprehensive health checks are available via Spring Boot Actuator.
  */
 @Tag(name = "Health", description = "Keep-alive endpoint (see /actuator/health for full details)")
 @RestController

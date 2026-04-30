@@ -1,29 +1,26 @@
 package com.buyapi.controller;
 
-import com.buyapi.config.WebMvcTestSecurityConfig;
-import com.buyapi.dto.request.AuthRequest;
-import com.buyapi.dto.response.Responses.AuthResponse;
-import com.buyapi.service.impl.AuthService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.buyapi.config.WebMvcTestSecurityConfig;
+import com.buyapi.dto.request.AuthRequest;
+import com.buyapi.dto.response.Responses.AuthResponse;
+import com.buyapi.service.impl.AuthService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * @WebMvcTest slice for authentication endpoints.
- *
- * Notes:
- * - Uses @MockitoBean (Spring Boot 4 replacement for @MockBean).
- * - ObjectMapper is instantiated manually as it is not auto-configured in this slice.
+ * {@code @WebMvcTest} slice for authentication endpoints.
  */
 @WebMvcTest(controllers = AuthController.class)
 @Import(WebMvcTestSecurityConfig.class)

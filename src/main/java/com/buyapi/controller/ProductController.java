@@ -90,6 +90,17 @@ public class ProductController {
         return ResponseEntity.ok(productService.uploadImage(id, file, caller.getUsername(), isAdmin));
     }
 
+    @Operation(summary = "Remove product image")
+    @SecurityRequirement(name = "bearerAuth")
+    @DeleteMapping("/{id}/image")
+    public ResponseEntity<ProductResponse> removeImage(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails caller) {
+        boolean isAdmin = caller.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(productService.removeImage(id, caller.getUsername(), isAdmin));
+    }
+
     @Operation(summary = "Delete product")
     @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{id}")

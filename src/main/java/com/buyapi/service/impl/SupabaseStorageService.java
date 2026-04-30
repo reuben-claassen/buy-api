@@ -14,14 +14,6 @@ import com.buyapi.exception.BadRequestException;
 
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Uploads product images to Supabase Storage using the REST API.
- *
- * Required environment variables:
- *   SUPABASE_URL        — e.g. https://xxxxxxxxxxxx.supabase.co
- *   SUPABASE_KEY        — secret key (sb_secret_...) from Settings → API Keys
- *   SUPABASE_BUCKET     — storage bucket name (default: products)
- */
 @Slf4j
 @Service
 public class SupabaseStorageService {
